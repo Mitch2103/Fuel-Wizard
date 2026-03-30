@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fuel Wizard</title>
+<style>
+body{font-family:sans-serif;background:#08111f;color:white;padding:20px}
+button{display:block;width:100%;padding:15px;margin:10px 0;font-size:18px}
+.card{background:#101b2d;padding:15px;border-radius:10px}
+</style>
+</head>
+<body>
+
+<h2>FAM Fuel Wizard</h2>
+
+<div id="app" class="card"></div>
+
+<script>
+let step = 0;
+
+function render(){
+  let app = document.getElementById("app");
+
+  if(step===0){
+    app.innerHTML = `
+      <h3>Before or After DPA?</h3>
+      <button onclick="step=1;render()">At DPA</button>
+      <button onclick="result('APPLY LANDING MINIMA')">After DPA</button>
+    `;
+  }
+
+  if(step===1){
+    app.innerHTML = `
+      <h3>Is destination isolated?</h3>
+      <button onclick="step=2;render()">Yes</button>
+      <button onclick="step=3;render()">No</button>
+    `;
+  }
+
+  if(step===2){
+    app.innerHTML = `
+      <h3>90 min holding available?</h3>
+      <button onclick="step=4;render()">Yes</button>
+      <button onclick="result('DIVERT → APPLY LANDING MINIMA')">No</button>
+    `;
+  }
+
+  if(step===4){
+    app.innerHTML = `
+      <h3>Above Qualifying Minima?</h3>
+      <button onclick="result('CONTINUE → QUALIFYING MINIMA')">Yes</button>
+      <button onclick="result('DIVERT → APPLY LANDING MINIMA')">No</button>
+    `;
+  }
+
+  if(step===3){
+    app.innerHTML = `
+      <h3>Fuel protected?</h3>
+      <button onclick="result('CONTINUE FLOW')">Yes</button>
+      <button onclick="result('DIVERT → APPLY LANDING MINIMA')">No</button>
+    `;
+  }
+}
+
+function result(text){
+  document.getElementById("app").innerHTML = `
+    <h2>${text}</h2>
+    <button onclick="step=0;render()">Reset</button>
+  `;
+}
+
+render();
+</script>
+
+</body>
+</html>
