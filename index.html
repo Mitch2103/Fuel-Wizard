@@ -11,24 +11,20 @@
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-.wrap{max-width:980px;margin:0 auto;padding:16px}
+.wrap{max-width:920px;margin:0 auto;padding:16px}
 h1{font-size:28px;margin:0 0 6px}
 .sub{color:var(--muted);margin:0 0 14px}
 .banner{background:#201909;border:1px solid #6f5811;color:#ffe08a;border-radius:14px;padding:12px 14px;margin-bottom:14px;line-height:1.45}
 .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
-.quickBar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
-@media (min-width:760px){.quickBar{grid-template-columns:repeat(5,minmax(0,1fr))}}
-.quickBtn{
-  appearance:none;border:1px solid var(--line);background:#0a1322;color:var(--text);
-  padding:12px;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;text-align:center
-}
-.quickBtn:hover{border-color:var(--blue)}
-.modeBar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.modeBar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
 .modeBtn{
   appearance:none;border:1px solid var(--line);background:#0a1322;color:var(--text);
   padding:12px;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer
 }
 .modeBtn.active{background:#17345d;border-color:#5fb0ff}
+.modeNote{
+  font-size:12px;color:var(--muted);margin:0 0 14px;padding:0 2px;line-height:1.4
+}
 .progressWrap{margin-bottom:14px}
 .progressBar{height:10px;background:#0a1322;border:1px solid var(--line);border-radius:999px;overflow:hidden}
 .progressFill{height:100%;background:var(--blue);width:0%}
@@ -81,7 +77,7 @@ footer{margin-top:18px;color:var(--muted);font-size:12px;line-height:1.45}
   <div class="sub">Guided inflight decision tool based on the Chapter 16 DPA / alternate / minima flow, with EDTO mode.</div>
 
   <div class="banner">
-    <strong>Use:</strong> answer one question at a time, or jump straight to a common branch using the quick buttons.<br>
+    <strong>Use:</strong> answer one question at a time and follow the policy logic through to a decision, minima set, and fuel protection outcome.<br>
     <strong>Intent:</strong> this is both a fast decision aid and a policy-following walkthrough, so the hints and result notes explain why each branch exists.
   </div>
 
@@ -90,14 +86,7 @@ footer{margin-top:18px;color:var(--muted);font-size:12px;line-height:1.45}
       <button id="modeStandard" class="modeBtn active" onclick="setMode('standard')">STANDARD</button>
       <button id="modeEdto" class="modeBtn" onclick="setMode('edto')">EDTO</button>
     </div>
-
-    <div class="quickBar">
-      <button class="quickBtn" onclick="jumpToResult('result_after_dpa')">AFTER DPA</button>
-      <button class="quickBtn" onclick="jumpToResult('result_continue_no_alt')">RDM / NO ALT</button>
-      <button class="quickBtn" onclick="jumpToResult('result_alt_required_qm')">ALT @ QM</button>
-      <button class="quickBtn" onclick="jumpToResult('result_alt_required_destreq')">DEST &lt; LM</button>
-      <button class="quickBtn" onclick="jumpToResult('result_edto_enter')">EDTO ENTRY PASS</button>
-    </div>
+    <div class="modeNote">Mode changes the logic path, not the answer style.</div>
 
     <div class="progressWrap">
       <div class="progressBar"><div id="progressFill" class="progressFill"></div></div>
@@ -147,7 +136,7 @@ var questions = {
 
   edtoEntry: {
     title: 'Are all EDTO entry conditions satisfied before EEP?',
-    hint: 'Use this as the EDTO gate. The idea is to stop entry into the EDTO segment if the required conditions are not satisfied. Once inside EDTO, you still monitor fuel under the normal Chapter 16 inflight logic.',
+    hint: 'Use this as the EDTO gate. The purpose is to stop entry into the EDTO segment if the required conditions are not satisfied. Once inside EDTO, you still monitor fuel under the normal Chapter 16 inflight logic.',
     options: [
       { label: 'Yes — EDTO entry conditions satisfied', value: 'edto_pass', next: 'result_edto_enter' },
       { label: 'No — do not enter EDTO segment', value: 'edto_fail', next: 'result_edto_do_not_enter' }
@@ -282,7 +271,7 @@ var results = {
     decision: 'Continue managing the flight after DPA.',
     minima: 'APPLY LANDING MINIMA now.',
     fuel: 'FRF protected at destination, destination alternate, or other Category A / B airport.',
-    edto: mode === 'edto' ? 'Inside EDTO or after DPA, normal Chapter 16 inflight logic still governs fuel monitoring.' : 'Not in EDTO mode.',
+    edto: 'After DPA, the same answer style applies in both modes.',
     why: [
       'After DPA, the specific DPA protections no longer need to be protected.',
       'The focus becomes landing safely above Landing Minima with FRF.'
@@ -310,7 +299,7 @@ var results = {
     label: 'DO NOT ENTER EDTO',
     title: 'EDTO entry gate not satisfied',
     decision: 'Do not enter the EDTO segment.',
-    minima: 'APPLY LANDING MINIMA at the safe airport if diversion / delay leads to a new landing assessment.',
+    minima: 'APPLY LANDING MINIMA at the safe airport if diversion or delay leads to a new landing assessment.',
     fuel: 'Maintain safe fuel and use the safer non-entry outcome.',
     edto: 'DO NOT ENTER EDTO SEGMENT.',
     why: [
@@ -473,13 +462,6 @@ function setMode(newMode){
   resetWizard();
 }
 
-function jumpToResult(resultId){
-  state.answers = {};
-  state.history = ['quickJump'];
-  state.current = resultId;
-  render();
-}
-
 function getQuestionConfig(id){
   var q = questions[id];
   if(id === 'start'){
@@ -549,14 +531,9 @@ function render(){
 function renderResult(id){
   var r = results[id];
   var pathRows = '';
+
   for(var i = 0; i < state.history.length; i++){
     var qid = state.history[i];
-
-    if(qid === 'quickJump'){
-      pathRows += '<div class="summaryRow"><strong>Quick branch</strong><br>Opened directly from a shortcut button.</div>';
-      continue;
-    }
-
     var q = getQuestionConfig(qid);
     var ans = state.answers[qid];
     var label = ans;
@@ -600,17 +577,9 @@ function resetWizard(){
 
 $('backBtn').onclick = function(){
   if(!state.history.length) return;
-
-  if(state.history.length === 1 && state.history[0] === 'quickJump'){
-    resetWizard();
-    return;
-  }
-
   var prev = state.history.pop();
-  if(prev !== 'quickJump'){
-    delete state.answers[prev];
-  }
-  state.current = prev === 'quickJump' ? 'start' : prev;
+  delete state.answers[prev];
+  state.current = prev;
   render();
 };
 
