@@ -1,76 +1,474 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fuel Wizard</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FAM Chapter 16 Inflight Fuel Wizard</title>
 <style>
-body{font-family:sans-serif;background:#08111f;color:white;padding:20px}
-button{display:block;width:100%;padding:15px;margin:10px 0;font-size:18px}
-.card{background:#101b2d;padding:15px;border-radius:10px}
+:root{
+  --bg:#08111f; --card:#101b2d; --card2:#0c1525; --text:#edf3ff; --muted:#9db0d5;
+  --line:#263759; --blue:#5fb0ff; --green:#1fb86a; --amber:#f0b53a; --red:#ef5a5a;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+h1{font-size:28px;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 14px}
+.banner{background:#201909;border:1px solid #6f5811;color:#ffe08a;border-radius:14px;padding:12px 14px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.progressWrap{margin-bottom:14px}
+.progressBar{height:10px;background:#0a1322;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.progressFill{height:100%;background:var(--blue);width:0%}
+.progressText{font-size:12px;color:var(--muted);margin-top:6px}
+.stepNum{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:999px;background:#17345d;color:#d8e9ff;font-weight:800;margin-bottom:10px}
+.question{font-size:24px;font-weight:800;margin:0 0 12px}
+.hint{font-size:14px;color:var(--muted);margin-bottom:14px;line-height:1.4}
+.choices{display:grid;grid-template-columns:1fr;gap:10px}
+.choice{appearance:none;border:1px solid var(--line);background:#0a1322;color:var(--text);padding:14px;border-radius:14px;text-align:left;font-size:17px;cursor:pointer;width:100%}
+.choice:hover{border-color:var(--blue)}
+.nav{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.ghost{appearance:none;border-radius:12px;padding:12px 14px;font-size:15px;cursor:pointer;background:#0a1322;color:var(--text);border:1px solid var(--line)}
+.summary{margin-top:16px;background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:14px}
+.summary h3{margin:0 0 10px;font-size:16px}
+.summaryRow{padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.summaryRow:last-child{border-bottom:none}
+.pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}
+.good{background:rgba(31,184,106,.14);color:#92efbe;border:1px solid rgba(31,184,106,.35)}
+.warn{background:rgba(240,181,58,.14);color:#ffd88b;border:1px solid rgba(240,181,58,.35)}
+.bad{background:rgba(239,90,90,.14);color:#ffaaaa;border:1px solid rgba(239,90,90,.35)}
+.info{background:rgba(95,176,255,.14);color:#b4d9ff;border:1px solid rgba(95,176,255,.35)}
+.resultTitle{font-size:26px;font-weight:800;margin:10px 0}
+.minimaBanner{margin-top:12px;padding:14px;border-radius:16px;font-weight:800;font-size:18px;border:1px solid var(--line);line-height:1.35}
+.minimaBanner.good{background:rgba(31,184,106,.12);color:#92efbe;border-color:rgba(31,184,106,.35)}
+.minimaBanner.warn{background:rgba(240,181,58,.12);color:#ffd88b;border-color:rgba(240,181,58,.35)}
+.minimaBanner.bad{background:rgba(239,90,90,.12);color:#ffb1b1;border-color:rgba(239,90,90,.35)}
+.minimaBanner.info{background:rgba(95,176,255,.12);color:#b4d9ff;border-color:rgba(95,176,255,.35)}
+ul{margin:8px 0 0 20px;padding:0}
+li{margin:8px 0}
+.hidden{display:none}
+.small{font-size:12px;color:var(--muted)}
+footer{margin-top:18px;color:var(--muted);font-size:12px;line-height:1.4}
 </style>
 </head>
 <body>
+<div class="wrap">
+  <h1>FAM Chapter 16 Inflight Fuel Wizard</h1>
+  <div class="sub">Guided inflight decision tool based on the Chapter 16 DPA / alternate / minima flow.</div>
+  <div class="banner">
+    <strong>Use:</strong> answer one question at a time. The tool will guide you to the relevant branch and show the minima to apply next.
+  </div>
 
-<h2>FAM Fuel Wizard</h2>
+  <div class="card">
+    <div class="progressWrap">
+      <div class="progressBar"><div id="progressFill" class="progressFill"></div></div>
+      <div id="progressText" class="progressText">Step 1</div>
+    </div>
 
-<div id="app" class="card"></div>
+    <div id="wizardStep"></div>
+
+    <div class="nav">
+      <button id="backBtn" class="ghost">Back</button>
+      <button id="resetBtn" class="ghost">Reset</button>
+    </div>
+
+    <div id="resultBox" class="summary hidden"></div>
+  </div>
+
+  <footer>
+    Decision aid only. FAM / RMS / company operational documents remain controlling.
+  </footer>
+</div>
 
 <script>
-let step = 0;
+var state = {
+  answers: {},
+  history: [],
+  current: 'atDpa'
+};
+
+var questions = {
+  atDpa: {
+    title: 'Are you still before / at DPA?',
+    hint: 'If you are after DPA, the DPA protections no longer need to be protected.',
+    options: [
+      { label: 'Yes — at / before DPA', value: 'yes', next: 'isolated' },
+      { label: 'No — after DPA', value: 'after', next: 'result_after_dpa' }
+    ]
+  },
+
+  isolated: {
+    title: 'Is the destination an isolated destination airport?',
+    hint: 'This determines whether the isolated destination branch applies.',
+    options: [
+      { label: 'No', value: 'no', next: 'baseFuel' },
+      { label: 'Yes', value: 'yes', next: 'iso90' }
+    ]
+  },
+
+  iso90: {
+    title: 'Do you have 90 minutes holding in lieu of destination alternate fuel and other holding?',
+    hint: 'This is the isolated destination fuel requirement at DPA.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'isoQm' },
+      { label: 'No', value: 'no', next: 'result_iso_divert' }
+    ]
+  },
+
+  isoQm: {
+    title: 'Is the destination forecast above Qualifying Minima at ETOU?',
+    hint: 'If not, you cannot continue on the isolated destination branch.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'result_iso_continue' },
+      { label: 'No', value: 'no', next: 'result_iso_divert' }
+    ]
+  },
+
+  baseFuel: {
+    title: 'Are Trip Fuel, Contingency Fuel, FRF, and other mandated fuel all protected?',
+    hint: 'This is the base fly-on gate. If this fails, the path stops here.',
+    options: [
+      { label: 'Yes — all protected', value: 'yes', next: 'destWeather' },
+      { label: 'No', value: 'no', next: 'result_base_divert' }
+    ]
+  },
+
+  destWeather: {
+    title: 'What is the destination weather status at ETOU?',
+    hint: 'Choose the destination weather branch that matches the current forecast status.',
+    options: [
+      { label: 'At or above Determining Minima', value: 'ge_dm', next: 'nonWeatherTrigger' },
+      { label: 'Below Determining Minima but at / above Landing Minima', value: 'between', next: 'rdmAvail' },
+      { label: 'Below Landing Minima', value: 'below_lm', next: 'altAtDestReq' },
+      { label: 'Forecast unavailable / incomplete', value: 'forecast_na', next: 'altAtDestReq' }
+    ]
+  },
+
+  rdmAvail: {
+    title: 'Is RDM available under FAM 16.5.4.4?',
+    hint: 'Only relevant where the destination is below DM but still at / above LM.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'destAtRdm' },
+      { label: 'No', value: 'no', next: 'altAtQm' }
+    ]
+  },
+
+  destAtRdm: {
+    title: 'If RDM is available, is the destination at or above RDM?',
+    hint: 'If yes, you can stay on the no-alternate weather branch.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'singleRunwayOutside' },
+      { label: 'No', value: 'no', next: 'altAtQm' }
+    ]
+  },
+
+  nonWeatherTrigger: {
+    title: 'Is there a separate non-weather alternate trigger?',
+    hint: 'Examples include runway, lighting, IAP, forecast-related or other company-required alternate triggers.',
+    options: [
+      { label: 'No', value: 'no', next: 'singleRunwayOutside' },
+      { label: 'Yes', value: 'yes', next: 'altAtQm' }
+    ]
+  },
+
+  singleRunwayOutside: {
+    title: 'Is it a single runway destination outside Australian territory?',
+    hint: 'This changes the no-alternate fuel protection requirement.',
+    options: [
+      { label: 'No', value: 'no', next: 'fuelDestAltOr15' },
+      { label: 'Yes', value: 'yes', next: 'fuelDestAltOr25and15' }
+    ]
+  },
+
+  fuelDestAltOr15: {
+    title: 'Do you have destination alternate fuel, or 15 minutes NDA fuel, and required holding?',
+    hint: 'This is the standard no-alternate branch.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'result_continue_no_alt' },
+      { label: 'No', value: 'no', next: 'result_divert_no_alt' }
+    ]
+  },
+
+  fuelDestAltOr25and15: {
+    title: 'Do you have destination alternate fuel, or 25 minutes holding plus 15 minutes NDA, and required holding?',
+    hint: 'This is the single runway outside Australia no-alternate branch.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'result_continue_no_alt' },
+      { label: 'No', value: 'no', next: 'result_divert_no_alt' }
+    ]
+  },
+
+  altAtQm: {
+    title: 'If an alternate is required, is the destination alternate at or above Qualifying Minima and are alternate fuel / required holding protected?',
+    hint: 'This is the standard alternate-required branch.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'result_alt_required_qm' },
+      { label: 'No', value: 'no', next: 'result_divert_alt' }
+    ]
+  },
+
+  altAtDestReq: {
+    title: 'If below Landing Minima or forecast unavailable, does the alternate meet destination airport requirements, with alternate fuel / required holding protected?',
+    hint: 'This is the stricter branch. It is not a plain Qualifying Minima check.',
+    options: [
+      { label: 'Yes', value: 'yes', next: 'result_alt_required_destreq' },
+      { label: 'No', value: 'no', next: 'result_divert_destreq' }
+    ]
+  }
+};
+
+var results = {
+  result_after_dpa: {
+    pill: 'info',
+    label: 'AFTER DPA',
+    title: 'Land safely above Landing Minima with FRF',
+    bullets: [
+      'DPA protections no longer need to be protected.',
+      'Manage the remainder of the flight to land safely above Landing Minima with FRF.',
+      'Use destination, destination alternate, or other Category A / B airport as appropriate.'
+    ],
+    clause: 'FAM 16.10.1 / 16.10.5',
+    minima: 'APPLY LANDING MINIMA now.'
+  },
+
+  result_iso_continue: {
+    pill: 'good',
+    label: 'CONTINUE',
+    title: 'Proceed beyond DPA to isolated destination',
+    bullets: [
+      'Continue using the isolated destination branch.',
+      'Protect 90 minutes holding in lieu of destination alternate fuel and other holding.',
+      'Destination forecast remains above Qualifying Minima at ETOU.'
+    ],
+    clause: 'FAM 16.10.4.2',
+    minima: 'APPLY QUALIFYING MINIMA for the isolated destination forecast check at ETOU.'
+  },
+
+  result_iso_divert: {
+    pill: 'bad',
+    label: 'DIVERT',
+    title: 'Isolated destination criteria not met',
+    bullets: [
+      'You cannot continue on the isolated destination branch.',
+      'Divert under the general inflight requirement.',
+      'Use the minima banner above for the minima set to apply next.'
+    ],
+    clause: 'FAM 16.10.4.2 / 16.10.1',
+    minima: 'APPLY LANDING MINIMA at the diversion airport.'
+  },
+
+  result_base_divert: {
+    pill: 'bad',
+    label: 'DIVERT',
+    title: 'Base fly-on fuel requirement not met',
+    bullets: [
+      'Trip Fuel / Contingency / FRF / other mandated fuel are not all protected.',
+      'Stop the path here and divert to the nominated DPA airport or other Category A / B airport.',
+      'Use the minima banner above for the minima set to apply next.'
+    ],
+    clause: 'FAM 16.10.4.1',
+    minima: 'APPLY LANDING MINIMA at the diversion airport.'
+  },
+
+  result_continue_no_alt: {
+    pill: 'good',
+    label: 'CONTINUE',
+    title: 'Continue to destination on the no-alternate branch',
+    bullets: [
+      'The no-alternate branch is satisfied.',
+      'Protect the relevant no-alternate fuel requirement plus required holding.'
+    ],
+    clause: 'FAM 16.10.4.1',
+    minima: 'APPLY DETERMINING MINIMA, or REDUCED DETERMINING MINIMA if that RDM branch was used.'
+  },
+
+  result_divert_no_alt: {
+    pill: 'bad',
+    label: 'DIVERT',
+    title: 'No-alternate fuel branch not satisfied',
+    bullets: [
+      'Required no-alternate fuel protection is not satisfied.',
+      'Stop the path here and divert to the nominated DPA airport or other Category A / B airport.',
+      'Use the minima banner above for the minima set to apply next.'
+    ],
+    clause: 'FAM 16.10.4.1',
+    minima: 'APPLY LANDING MINIMA at the diversion airport.'
+  },
+
+  result_alt_required_qm: {
+    pill: 'warn',
+    label: 'ALTERNATE REQUIRED',
+    title: 'Proceed with destination alternate at or above Qualifying Minima',
+    bullets: [
+      'Use the standard alternate-required branch.',
+      'Protect destination alternate fuel and required holding fuel.',
+      'Use the minima banner above for the minima set to apply to that alternate check.'
+    ],
+    clause: 'FAM 16.7.2.1 / 16.10.4.1',
+    minima: 'APPLY QUALIFYING MINIMA to the destination alternate at ETOU.'
+  },
+
+  result_divert_alt: {
+    pill: 'bad',
+    label: 'DIVERT',
+    title: 'Alternate requirement not satisfied',
+    bullets: [
+      'Required alternate standard or associated fuel protection is not satisfied.',
+      'Stop the path here and divert to the nominated DPA airport or other Category A / B airport.',
+      'Use the minima banner above for the minima set to apply next.'
+    ],
+    clause: 'FAM 16.7.2.1 / 16.10.4.1',
+    minima: 'APPLY LANDING MINIMA at the diversion airport.'
+  },
+
+  result_alt_required_destreq: {
+    pill: 'warn',
+    label: 'ALTERNATE REQUIRED',
+    title: 'Proceed only with alternate meeting destination airport requirements',
+    bullets: [
+      'This is the stricter below-LM / forecast-unavailable branch.',
+      'Use destination airport requirements, not plain Qualifying Minima.',
+      'Protect destination alternate fuel and required holding fuel.',
+      'Use the minima banner above for the minima set to apply to that alternate check.'
+    ],
+    clause: 'FAM 16.7.2.2 / 16.10.4.1',
+    minima: 'APPLY DESTINATION AIRPORT REQUIREMENTS to the alternate: DETERMINING MINIMA or RDM as applicable, including separate runway considerations.'
+  },
+
+  result_divert_destreq: {
+    pill: 'bad',
+    label: 'DIVERT',
+    title: 'Below Landing Minima / forecast unavailable branch not satisfied',
+    bullets: [
+      'Alternate does not meet destination airport requirements, or associated fuel protection is not satisfied.',
+      'Stop the path here and divert to the nominated DPA airport or other Category A / B airport.',
+      'Use the minima banner above for the minima set to apply next.'
+    ],
+    clause: 'FAM 16.7.2.2 / 16.10.4.1',
+    minima: 'APPLY LANDING MINIMA at the diversion airport.'
+  }
+};
+
+function $(id){ return document.getElementById(id); }
+
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+function escapeAttr(s){
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
 
 function render(){
-  let app = document.getElementById("app");
+  var stepEl = $('wizardStep');
+  var resultBox = $('resultBox');
+  var backBtn = $('backBtn');
+  var progressFill = $('progressFill');
+  var progressText = $('progressText');
+  var id = state.current;
 
-  if(step===0){
-    app.innerHTML = `
-      <h3>Before or After DPA?</h3>
-      <button onclick="step=1;render()">At DPA</button>
-      <button onclick="result('APPLY LANDING MINIMA')">After DPA</button>
-    `;
+  if(results[id]){
+    stepEl.innerHTML = '';
+    resultBox.className = 'summary';
+    resultBox.innerHTML = renderResult(id);
+    backBtn.disabled = state.history.length === 0;
+    progressFill.style.width = '100%';
+    progressText.textContent = 'Complete';
+    return;
   }
 
-  if(step===1){
-    app.innerHTML = `
-      <h3>Is destination isolated?</h3>
-      <button onclick="step=2;render()">Yes</button>
-      <button onclick="step=3;render()">No</button>
-    `;
+  resultBox.className = 'summary hidden';
+
+  var q = questions[id];
+  var stepNumber = state.history.length + 1;
+  var pct = Math.min(90, Math.round((stepNumber / 8) * 100));
+
+  progressFill.style.width = pct + '%';
+  progressText.textContent = 'Step ' + stepNumber;
+
+  var h = '';
+  h += '<div class="stepNum">' + stepNumber + '</div>';
+  h += '<div class="question">' + escapeHtml(q.title) + '</div>';
+  h += '<div class="hint">' + escapeHtml(q.hint) + '</div>';
+  h += '<div class="choices">';
+
+  for(var i = 0; i < q.options.length; i++){
+    var opt = q.options[i];
+    h += '<button class="choice" data-next="' + escapeAttr(opt.next) + '" data-value="' + escapeAttr(opt.value) + '">' + escapeHtml(opt.label) + '</button>';
   }
 
-  if(step===2){
-    app.innerHTML = `
-      <h3>90 min holding available?</h3>
-      <button onclick="step=4;render()">Yes</button>
-      <button onclick="result('DIVERT → APPLY LANDING MINIMA')">No</button>
-    `;
+  h += '</div>';
+  stepEl.innerHTML = h;
+
+  var buttons = stepEl.querySelectorAll('.choice');
+  for(var j = 0; j < buttons.length; j++){
+    buttons[j].onclick = function(){
+      state.answers[id] = this.getAttribute('data-value');
+      state.history.push(id);
+      state.current = this.getAttribute('data-next');
+      render();
+    };
   }
 
-  if(step===4){
-    app.innerHTML = `
-      <h3>Above Qualifying Minima?</h3>
-      <button onclick="result('CONTINUE → QUALIFYING MINIMA')">Yes</button>
-      <button onclick="result('DIVERT → APPLY LANDING MINIMA')">No</button>
-    `;
-  }
-
-  if(step===3){
-    app.innerHTML = `
-      <h3>Fuel protected?</h3>
-      <button onclick="result('CONTINUE FLOW')">Yes</button>
-      <button onclick="result('DIVERT → APPLY LANDING MINIMA')">No</button>
-    `;
-  }
+  backBtn.disabled = state.history.length === 0;
 }
 
-function result(text){
-  document.getElementById("app").innerHTML = `
-    <h2>${text}</h2>
-    <button onclick="step=0;render()">Reset</button>
-  `;
+function renderResult(id){
+  var r = results[id];
+  var pathRows = '';
+
+  for(var i = 0; i < state.history.length; i++){
+    var qid = state.history[i];
+    var q = questions[qid];
+    var ans = state.answers[qid];
+    var label = ans;
+
+    for(var k = 0; k < q.options.length; k++){
+      if(q.options[k].value === ans){
+        label = q.options[k].label;
+        break;
+      }
+    }
+
+    pathRows += '<div class="summaryRow"><strong>' + (i + 1) + '. ' + escapeHtml(q.title) + '</strong><br>' + escapeHtml(label) + '</div>';
+  }
+
+  var bullets = '';
+  for(var b = 0; b < r.bullets.length; b++){
+    bullets += '<li>' + escapeHtml(r.bullets[b]) + '</li>';
+  }
+
+  return ''
+    + '<span class="pill ' + r.pill + '">' + escapeHtml(r.label) + '</span>'
+    + '<div class="resultTitle">' + escapeHtml(r.title) + '</div>'
+    + '<div class="minimaBanner ' + r.pill + '">' + escapeHtml(r.minima) + '</div>'
+    + '<ul>' + bullets + '</ul>'
+    + '<div class="small" style="margin-top:10px">Clause set: ' + escapeHtml(r.clause) + '</div>'
+    + '<div class="summary"><h3>Your path</h3>' + (pathRows || '<div class="summaryRow">No path recorded.</div>') + '</div>';
 }
+
+$('backBtn').onclick = function(){
+  if(!state.history.length) return;
+  var prev = state.history.pop();
+  delete state.answers[prev];
+  state.current = prev;
+  render();
+};
+
+$('resetBtn').onclick = function(){
+  state.answers = {};
+  state.history = [];
+  state.current = 'atDpa';
+  render();
+};
 
 render();
 </script>
-
 </body>
 </html>
